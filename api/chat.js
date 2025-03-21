@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 // 使用环境变量获取 API 密钥
-const API_KEY = process.env.ARK_API_KEY || 'sk-5d5b98f077914f0bb4fd1b4cb632b2e8';
+const API_KEY = process.env.ARK_API_KEY || '5d5b98f077914f0bb4fd1b4cb632b2e8';
 const API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/chat/completions';
 
 // 检查必要的环境变量
