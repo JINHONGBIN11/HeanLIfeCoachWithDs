@@ -7,9 +7,19 @@ const API_URL = process.env.DEEPSEEK_API_URL || 'https://ark.cn-beijing.volces.c
 // 检查必要的环境变量
 if (!API_KEY) {
     console.error('错误: 未设置 DEEPSEEK_API_KEY 环境变量');
+} else {
+    console.log('API Key 已设置，长度:', API_KEY.length);
 }
 
+console.log('API URL:', API_URL);
+
 module.exports = async (req, res) => {
+    console.log('收到请求:', {
+        method: req.method,
+        headers: req.headers,
+        body: req.body
+    });
+
     // 设置 CORS 头
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -21,12 +31,14 @@ module.exports = async (req, res) => {
 
     // 处理 OPTIONS 请求
     if (req.method === 'OPTIONS') {
+        console.log('处理 OPTIONS 请求');
         res.status(200).end();
         return;
     }
 
     // 只允许 POST 请求
     if (req.method !== 'POST') {
+        console.log('不支持的请求方法:', req.method);
         return res.status(405).json({ error: '方法不允许' });
     }
 
@@ -45,13 +57,14 @@ module.exports = async (req, res) => {
             content: msg.content.slice(0, 300) // 减少每条消息的最大长度
         }));
 
-        console.log('准备发送到 DeepSeek API');
+        console.log('准备发送到 DeepSeek API，消息:', truncatedMessages);
         
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 8000); // 设置为 8 秒，确保在 Vercel 超时前完成
 
         try {
+            console.log('发送请求到 DeepSeek API');
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: {
@@ -89,6 +102,8 @@ module.exports = async (req, res) => {
                 throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
             }
 
+            console.log('收到 DeepSeek API 响应');
+
             // 设置响应头
             res.setHeader('Content-Type', 'text/event-stream');
             res.setHeader('Cache-Control', 'no-cache');
@@ -105,6 +120,7 @@ module.exports = async (req, res) => {
                     if (line.startsWith('data: ')) {
                         const data = line.slice(6);
                         if (data === '[DONE]') {
+                            console.log('收到完成信号');
                             res.write('data: [DONE]\n\n');
                             res.end();
                             return;
@@ -112,6 +128,7 @@ module.exports = async (req, res) => {
                         try {
                             const parsed = JSON.parse(data);
                             if (parsed.choices?.[0]?.delta?.content) {
+                                console.log('收到内容:', parsed.choices[0].delta.content);
                                 res.write(`data: ${JSON.stringify(parsed.choices[0].delta)}\n\n`);
                             }
                         } catch (e) {
@@ -122,6 +139,7 @@ module.exports = async (req, res) => {
             });
 
             response.body.on('end', () => {
+                console.log('响应流结束');
                 // 处理剩余的缓冲区
                 if (buffer) {
                     const lines = buffer.split('\n');
