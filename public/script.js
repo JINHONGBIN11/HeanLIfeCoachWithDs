@@ -190,25 +190,37 @@ async function sendMessage(content) {
             body: JSON.stringify({ messages })
         });
 
-        let errorData;
         let responseData;
-
         try {
             const textResponse = await response.text();
+            console.log('收到服务器响应:', textResponse);
+            
             try {
                 responseData = JSON.parse(textResponse);
-                if (!response.ok) {
-                    errorData = responseData;
-                    throw new Error(errorData.message || `API 请求失败: ${response.status}`);
-                }
             } catch (parseError) {
                 console.error('JSON 解析错误:', parseError);
-                throw new Error('服务器返回了无效的数据格式');
+                if (response.ok) {
+                    // 如果响应是成功的但不是 JSON，直接使用文本作为回复
+                    responseData = {
+                        choices: [{
+                            message: {
+                                content: textResponse
+                            }
+                        }]
+                    };
+                } else {
+                    throw new Error('服务器返回了无效的数据格式');
+                }
+            }
+
+            if (!response.ok) {
+                throw new Error(responseData.message || `API 请求失败: ${response.status}`);
             }
         } catch (error) {
             throw new Error(error.message || '无法连接到服务器');
         }
 
+        console.log('处理后的响应数据:', responseData);
         const aiResponse = responseData.choices[0].message.content;
         
         // 显示 AI 响应

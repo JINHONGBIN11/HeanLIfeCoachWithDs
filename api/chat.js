@@ -66,6 +66,7 @@ module.exports = async (req, res) => {
 
         console.log('开始请求 DeepSeek API...');
         console.log('API URL:', API_URL);
+        console.log('请求消息:', JSON.stringify(messages, null, 2));
         
         // 发送请求到 DeepSeek API
         const response = await fetchWithTimeout(API_URL, {
@@ -89,20 +90,34 @@ module.exports = async (req, res) => {
         console.log('DeepSeek API 响应状态:', response.status);
 
         const responseText = await response.text();
-        console.log('DeepSeek API 响应内容:', responseText);
+        console.log('DeepSeek API 原始响应:', responseText);
+
+        // 如果响应不是 JSON 格式，创建一个标准格式的响应
+        let data;
+        try {
+            data = JSON.parse(responseText);
+        } catch (parseError) {
+            console.log('响应不是 JSON 格式，创建标准响应');
+            // 如果响应不是 JSON，但状态码是 200，则将文本作为消息内容
+            if (response.ok) {
+                data = {
+                    choices: [{
+                        message: {
+                            content: responseText
+                        }
+                    }]
+                };
+            } else {
+                throw new Error(responseText || '服务器返回了无效的响应');
+            }
+        }
 
         if (!response.ok) {
-            throw new Error(`API 请求失败: ${response.status} - ${responseText}`);
+            throw new Error(data.error?.message || `API 请求失败: ${response.status}`);
         }
 
-        try {
-            const data = JSON.parse(responseText);
-            console.log('成功解析 DeepSeek API 响应');
-            res.status(200).json(data);
-        } catch (parseError) {
-            console.error('JSON 解析错误:', parseError);
-            throw new Error(`响应格式错误: ${responseText}`);
-        }
+        console.log('处理后的响应数据:', JSON.stringify(data, null, 2));
+        res.status(200).json(data);
         
     } catch (error) {
         console.error('API 调用错误:', error);
