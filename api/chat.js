@@ -120,7 +120,16 @@ module.exports = async (req, res) => {
             console.log('API 响应:', data);
             
             // 发送响应
-            res.json(data);
+            try {
+                res.json(data);
+                console.log('响应已发送');
+            } catch (error) {
+                console.error('发送响应时出错:', error);
+                res.status(500).json({ 
+                    error: '发送响应失败',
+                    message: error.message
+                });
+            }
             
         } catch (error) {
             console.error('API 调用错误:', error);
@@ -128,22 +137,26 @@ module.exports = async (req, res) => {
             
             // 发送详细的错误信息
             if (error.name === 'AbortError') {
+                console.error('请求超时');
                 res.status(504).json({ 
                     error: '请求超时',
                     message: '服务器处理请求超时，请尝试发送更短的消息，或稍后重试。'
                 });
             } else {
+                console.error('API 错误:', error);
                 res.status(500).json({ 
                     error: '服务器错误',
-                    message: error.message
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 });
             }
         }
     } catch (error) {
-        console.error('API 调用错误:', error);
+        console.error('处理请求时出错:', error);
         res.status(500).json({ 
             error: '服务器错误',
-            message: error.message
+            message: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 };
