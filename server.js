@@ -40,40 +40,52 @@ app.post('/api/chat', async (req, res) => {
         
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60 秒超时
 
-        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'deepseek-chat',
-                messages: [
-                    {
-                        role: 'system',
-                        content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
+        // 添加重试机制
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        const makeRequest = async () => {
+            try {
+                const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${API_KEY}`
                     },
-                    ...messages
-                ],
-                stream: true
-            }),
-            signal: controller.signal
-        });
-        
+                    body: JSON.stringify({
+                        model: 'deepseek-chat',
+                        messages: [
+                            {
+                                role: 'system',
+                                content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
+                            },
+                            ...messages
+                        ],
+                        stream: true
+                    }),
+                    signal: controller.signal
+                });
+                
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
+                }
+                
+                return response;
+            } catch (error) {
+                if (error.name === 'AbortError' && retryCount < maxRetries) {
+                    retryCount++;
+                    console.log(`重试请求 (${retryCount}/${maxRetries})`);
+                    return makeRequest();
+                }
+                throw error;
+            }
+        };
+
+        const response = await makeRequest();
         clearTimeout(timeoutId);
-        
-        // 检查响应状态
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error('DeepSeek API 错误:', {
-                status: response.status,
-                statusText: response.statusText,
-                error: errorText
-            });
-            throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
-        }
         
         console.log('成功连接到 DeepSeek API');
         
