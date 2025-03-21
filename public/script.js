@@ -181,7 +181,7 @@ async function sendMessage(content) {
         // 显示加载指示器
         loadingIndicator.classList.remove('hidden');
         
-        // 创建 EventSource 连接
+        // 发送请求到服务器
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
@@ -189,42 +189,16 @@ async function sendMessage(content) {
             },
             body: JSON.stringify({ messages })
         });
-        
-        // 创建 AI 消息容器
-        const aiMessageDiv = document.createElement('div');
-        aiMessageDiv.className = 'message ai-message';
-        const aiMessageContent = document.createElement('div');
-        aiMessageContent.className = 'message-content';
-        aiMessageDiv.appendChild(aiMessageContent);
-        chatContainer.appendChild(aiMessageDiv);
-        
-        // 处理流式响应
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let aiResponse = '';
-        
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    try {
-                        const data = JSON.parse(line.slice(6));
-                        if (data.choices && data.choices[0].delta.content) {
-                            aiResponse += data.choices[0].delta.content;
-                            aiMessageContent.textContent = aiResponse;
-                            chatContainer.scrollTop = chatContainer.scrollHeight;
-                        }
-                    } catch (e) {
-                        console.error('解析响应数据失败:', e);
-                    }
-                }
-            }
+
+        if (!response.ok) {
+            throw new Error(`API 请求失败: ${response.status}`);
         }
+
+        const data = await response.json();
+        const aiResponse = data.choices[0].message.content;
+        
+        // 显示 AI 响应
+        addMessage(aiResponse);
         
         // 添加 AI 响应到历史记录
         messages.push({ role: 'assistant', content: aiResponse });
