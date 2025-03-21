@@ -73,10 +73,7 @@ module.exports = async (req, res) => {
                 },
                 body: JSON.stringify({
                     model: "deepseek-r1-250120",
-                    messages: [
-                        { role: "system", content: "你是人工智能助手." },
-                        { role: "user", content: messages[messages.length - 1].content }
-                    ]
+                    messages: messages
                 }),
                 signal: controller.signal
             });
