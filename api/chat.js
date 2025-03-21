@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 // 使用环境变量获取 API 密钥
 const API_KEY = process.env.DEEPSEEK_API_KEY;
-const API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
+const API_URL = process.env.DEEPSEEK_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 // 检查必要的环境变量
 if (!API_KEY) {
@@ -61,11 +61,7 @@ module.exports = async (req, res) => {
                             content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
                         },
                         ...messages.slice(-2)
-                    ],
-                    stream: false, // 禁用流式响应
-                    max_tokens: 300,
-                    temperature: 0.7,
-                    presence_penalty: 0.6
+                    ]
                 }),
                 signal: controller.signal
             });
