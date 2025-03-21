@@ -33,75 +33,77 @@ app.post('/api/chat', async (req, res) => {
         console.log('准备发送到 DeepSeek API');
         console.log('API Key:', API_KEY ? '已设置' : '未设置');
         
-        // 设置响应头，启用流式传输
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-        
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60 秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 秒超时
 
-        // 添加重试机制
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        const makeRequest = async () => {
-            try {
-                const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${API_KEY}`
-                    },
-                    body: JSON.stringify({
-                        model: 'deepseek-chat',
-                        messages: [
-                            {
-                                role: 'system',
-                                content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
-                            },
-                            ...messages
-                        ],
-                        stream: true
-                    }),
-                    signal: controller.signal
-                });
-                
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
-                }
-                
-                return response;
-            } catch (error) {
-                if (error.name === 'AbortError' && retryCount < maxRetries) {
-                    retryCount++;
-                    console.log(`重试请求 (${retryCount}/${maxRetries})`);
-                    return makeRequest();
-                }
-                throw error;
+        try {
+            const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
+                        },
+                        ...messages
+                    ],
+                    stream: true
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
             }
-        };
-
-        const response = await makeRequest();
-        clearTimeout(timeoutId);
-        
-        console.log('成功连接到 DeepSeek API');
-        
-        // 将 API 响应流式传输到客户端
-        response.body.pipe(res);
-        
-        // 处理流结束
-        response.body.on('end', () => {
-            console.log('响应流结束');
+            
+            console.log('成功连接到 DeepSeek API');
+            
+            // 设置响应头，启用流式传输
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            
+            // 将 API 响应流式传输到客户端
+            response.body.pipe(res);
+            
+            // 处理流结束
+            response.body.on('end', () => {
+                console.log('响应流结束');
+                clearTimeout(timeoutId);
+            });
+            
+            // 处理流错误
+            response.body.on('error', (error) => {
+                console.error('响应流错误:', error);
+                clearTimeout(timeoutId);
+                if (error.name === 'AbortError') {
+                    res.status(504).json({ 
+                        error: '请求超时',
+                        message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
+                    });
+                } else {
+                    res.status(500).json({ 
+                        error: '流处理错误',
+                        message: error.message
+                    });
+                }
+                res.end();
+            });
+            
+        } catch (error) {
+            console.error('API 调用错误:', error);
             clearTimeout(timeoutId);
-        });
-        
-        // 处理流错误
-        response.body.on('error', (error) => {
-            console.error('响应流错误:', error);
-            clearTimeout(timeoutId);
+            
+            // 发送详细的错误信息
             if (error.name === 'AbortError') {
                 res.status(504).json({ 
                     error: '请求超时',
@@ -109,13 +111,12 @@ app.post('/api/chat', async (req, res) => {
                 });
             } else {
                 res.status(500).json({ 
-                    error: '流处理错误',
-                    message: error.message
+                    error: '服务器错误',
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
                 });
             }
-            res.end();
-        });
-        
+        }
     } catch (error) {
         console.error('API 调用错误:', error);
         // 发送详细的错误信息

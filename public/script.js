@@ -173,71 +173,63 @@ async function sendMessage(content) {
         
         // 创建 AbortController 用于超时控制
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 增加到 60 秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 秒超时
         
-        const response = await fetch('/api/chat', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ messages }),
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => null);
-            let errorMessage = '服务器错误';
-            
-            if (response.status === 504) {
-                errorMessage = '请求超时，请尝试发送更短的消息，或稍后重试';
-            } else if (errorData?.message) {
-                errorMessage = errorData.message;
-            }
-            
-            throw new Error(errorMessage);
-        }
-
-        let responseData;
         try {
-            const textResponse = await response.text();
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ messages }),
+                signal: controller.signal
+            });
             
-            try {
-                responseData = JSON.parse(textResponse);
-            } catch (parseError) {
-                if (response.ok) {
-                    // 如果响应是成功的但不是 JSON，直接使用文本作为回复
-                    responseData = {
-                        choices: [{
-                            message: {
-                                content: textResponse.slice(0, 500) // 限制响应长度
-                            }
-                        }]
-                    };
-                } else {
-                    throw new Error(textResponse || '服务器返回了无效的数据格式');
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => null);
+                let errorMessage = '服务器错误';
+                
+                if (response.status === 504) {
+                    errorMessage = '请求超时，请尝试发送更短的消息，或稍后重试';
+                } else if (errorData?.message) {
+                    errorMessage = errorData.message;
                 }
+                
+                throw new Error(errorMessage);
             }
-
+            
+            let responseData;
+            try {
+                responseData = await response.json();
+            } catch (error) {
+                console.error('解析响应失败:', error);
+                throw new Error('服务器返回了无效的响应格式');
+            }
+            
+            // 验证响应格式
             if (!responseData.choices?.[0]?.message?.content) {
                 throw new Error('服务器返回了无效的响应格式');
             }
+            
+            const aiResponse = responseData.choices[0].message.content;
+            
+            // 显示 AI 响应
+            addMessage(aiResponse);
+            
+            // 添加 AI 响应到历史记录
+            messages.push({ role: 'assistant', content: aiResponse });
+            
+            // 保存更新后的对话
+            saveCurrentConversation();
+            
         } catch (error) {
-            throw new Error(error.message || '无法连接到服务器');
+            if (error.name === 'AbortError') {
+                throw new Error('请求超时，请尝试发送更短的消息，或稍后重试');
+            }
+            throw error;
         }
-
-        const aiResponse = responseData.choices[0].message.content;
-        
-        // 显示 AI 响应
-        addMessage(aiResponse);
-        
-        // 添加 AI 响应到历史记录
-        messages.push({ role: 'assistant', content: aiResponse });
-        
-        // 保存更新后的对话
-        saveCurrentConversation();
-        
     } catch (error) {
         console.error('发送消息失败:', error);
         let errorMessage = '抱歉，发生了一些错误。';
