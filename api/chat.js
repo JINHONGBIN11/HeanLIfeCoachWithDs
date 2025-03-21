@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
-// 设置超时时间为 50 秒
-const TIMEOUT = 50000;
+// 设置超时时间为 8 秒（留出余量）
+const TIMEOUT = 8000;
 
 // 创建带超时的 fetch
 const fetchWithTimeout = async (url, options) => {
@@ -20,6 +20,9 @@ const fetchWithTimeout = async (url, options) => {
         throw error;
     }
 };
+
+// 简化系统提示以减少 token 数量
+const SYSTEM_PROMPT = '你是一位专业的生活教练。';
 
 module.exports = async (req, res) => {
     // 启用 CORS
@@ -52,6 +55,9 @@ module.exports = async (req, res) => {
             });
         }
 
+        // 限制消息历史长度，只保留最后 3 条消息
+        const recentMessages = messages.slice(-3);
+
         // 从环境变量获取 API 配置
         const API_KEY = process.env.DEEPSEEK_API_KEY;
         const API_URL = process.env.DEEPSEEK_API_URL;
@@ -64,10 +70,6 @@ module.exports = async (req, res) => {
             throw new Error('未设置 DEEPSEEK_API_URL 环境变量');
         }
 
-        console.log('开始请求 DeepSeek API...');
-        console.log('API URL:', API_URL);
-        console.log('请求消息:', JSON.stringify(messages, null, 2));
-        
         // 发送请求到 DeepSeek API
         const response = await fetchWithTimeout(API_URL, {
             method: 'POST',
@@ -80,24 +82,22 @@ module.exports = async (req, res) => {
                 messages: [
                     {
                         role: 'system',
-                        content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
+                        content: SYSTEM_PROMPT
                     },
-                    ...messages
-                ]
+                    ...recentMessages
+                ],
+                max_tokens: 500,  // 限制响应长度
+                temperature: 0.7  // 降低随机性以加快响应
             })
         });
 
-        console.log('DeepSeek API 响应状态:', response.status);
-
         const responseText = await response.text();
-        console.log('DeepSeek API 原始响应:', responseText);
 
         // 如果响应不是 JSON 格式，创建一个标准格式的响应
         let data;
         try {
             data = JSON.parse(responseText);
         } catch (parseError) {
-            console.log('响应不是 JSON 格式，创建标准响应');
             // 如果响应不是 JSON，但状态码是 200，则将文本作为消息内容
             if (response.ok) {
                 data = {
@@ -116,7 +116,6 @@ module.exports = async (req, res) => {
             throw new Error(data.error?.message || `API 请求失败: ${response.status}`);
         }
 
-        console.log('处理后的响应数据:', JSON.stringify(data, null, 2));
         res.status(200).json(data);
         
     } catch (error) {

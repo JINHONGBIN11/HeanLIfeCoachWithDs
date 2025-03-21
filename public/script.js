@@ -187,13 +187,14 @@ async function sendMessage(content) {
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ messages })
+            body: JSON.stringify({ 
+                messages: messages.slice(-3) // 只发送最后 3 条消息
+            })
         });
 
         let responseData;
         try {
             const textResponse = await response.text();
-            console.log('收到服务器响应:', textResponse);
             
             try {
                 responseData = JSON.parse(textResponse);
@@ -209,18 +210,22 @@ async function sendMessage(content) {
                         }]
                     };
                 } else {
-                    throw new Error('服务器返回了无效的数据格式');
+                    throw new Error(textResponse || '服务器返回了无效的数据格式');
                 }
             }
 
             if (!response.ok) {
-                throw new Error(responseData.message || `API 请求失败: ${response.status}`);
+                const errorMessage = responseData.message || responseData.error?.message || `API 请求失败: ${response.status}`;
+                if (response.status === 504) {
+                    throw new Error('服务器响应超时，请尝试发送更短的消息');
+                } else {
+                    throw new Error(errorMessage);
+                }
             }
         } catch (error) {
             throw new Error(error.message || '无法连接到服务器');
         }
 
-        console.log('处理后的响应数据:', responseData);
         const aiResponse = responseData.choices[0].message.content;
         
         // 显示 AI 响应
