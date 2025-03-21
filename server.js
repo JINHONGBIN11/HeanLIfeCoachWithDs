@@ -35,7 +35,7 @@ app.post('/api/chat', async (req, res) => {
         
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 减少到 8 秒超时，留出 2 秒缓冲时间
 
         try {
             const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -51,9 +51,10 @@ app.post('/api/chat', async (req, res) => {
                             role: 'system',
                             content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
                         },
-                        ...messages
+                        ...messages.slice(-4) // 只发送最近的 4 条消息，减少数据量
                     ],
-                    stream: true
+                    stream: true,
+                    max_tokens: 500 // 限制响应长度
                 }),
                 signal: controller.signal
             });
