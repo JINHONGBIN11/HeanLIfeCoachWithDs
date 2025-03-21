@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
-// 设置超时时间为 8 秒（留出余量）
-const TIMEOUT = 8000;
+// 设置超时时间为 5 秒
+const TIMEOUT = 5000;
 
 // 创建带超时的 fetch
 const fetchWithTimeout = async (url, options) => {
@@ -22,7 +22,15 @@ const fetchWithTimeout = async (url, options) => {
 };
 
 // 简化系统提示以减少 token 数量
-const SYSTEM_PROMPT = '你是一位专业的生活教练。';
+const SYSTEM_PROMPT = '你是AI生活教练';
+
+// 预处理消息，减少 token 数量
+function preprocessMessages(messages) {
+    return messages.map(msg => ({
+        role: msg.role,
+        content: msg.content.slice(0, 200) // 限制每条消息的长度
+    }));
+}
 
 module.exports = async (req, res) => {
     // 启用 CORS
@@ -55,8 +63,11 @@ module.exports = async (req, res) => {
             });
         }
 
-        // 限制消息历史长度，只保留最后 3 条消息
-        const recentMessages = messages.slice(-3);
+        // 限制消息历史长度，只保留最后 2 条消息
+        const recentMessages = messages.slice(-2);
+        
+        // 预处理消息
+        const processedMessages = preprocessMessages(recentMessages);
 
         // 从环境变量获取 API 配置
         const API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -84,10 +95,13 @@ module.exports = async (req, res) => {
                         role: 'system',
                         content: SYSTEM_PROMPT
                     },
-                    ...recentMessages
+                    ...processedMessages
                 ],
-                max_tokens: 500,  // 限制响应长度
-                temperature: 0.7  // 降低随机性以加快响应
+                max_tokens: 300,  // 进一步限制响应长度
+                temperature: 0.5,  // 降低随机性以加快响应
+                top_p: 0.8,       // 限制采样范围以加快响应
+                presence_penalty: 0,
+                frequency_penalty: 0
             })
         });
 
@@ -103,7 +117,7 @@ module.exports = async (req, res) => {
                 data = {
                     choices: [{
                         message: {
-                            content: responseText
+                            content: responseText.slice(0, 500) // 限制响应长度
                         }
                     }]
                 };
@@ -116,6 +130,11 @@ module.exports = async (req, res) => {
             throw new Error(data.error?.message || `API 请求失败: ${response.status}`);
         }
 
+        // 确保响应格式正确
+        if (!data.choices?.[0]?.message?.content) {
+            throw new Error('API 响应格式无效');
+        }
+
         res.status(200).json(data);
         
     } catch (error) {
@@ -125,7 +144,7 @@ module.exports = async (req, res) => {
         if (error.name === 'AbortError') {
             res.status(504).json({ 
                 error: '请求超时',
-                message: '服务器响应时间过长，请稍后重试'
+                message: '请尝试发送更短的消息，或稍后重试'
             });
         } else if (error.message.includes('JSON')) {
             res.status(502).json({ 

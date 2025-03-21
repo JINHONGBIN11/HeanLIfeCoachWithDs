@@ -188,7 +188,7 @@ async function sendMessage(content) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({ 
-                messages: messages.slice(-3) // 只发送最后 3 条消息
+                messages: messages.slice(-2) // 只发送最后 2 条消息
             })
         });
 
@@ -199,13 +199,12 @@ async function sendMessage(content) {
             try {
                 responseData = JSON.parse(textResponse);
             } catch (parseError) {
-                console.error('JSON 解析错误:', parseError);
                 if (response.ok) {
                     // 如果响应是成功的但不是 JSON，直接使用文本作为回复
                     responseData = {
                         choices: [{
                             message: {
-                                content: textResponse
+                                content: textResponse.slice(0, 500) // 限制响应长度
                             }
                         }]
                     };
@@ -217,10 +216,15 @@ async function sendMessage(content) {
             if (!response.ok) {
                 const errorMessage = responseData.message || responseData.error?.message || `API 请求失败: ${response.status}`;
                 if (response.status === 504) {
-                    throw new Error('服务器响应超时，请尝试发送更短的消息');
+                    throw new Error('请尝试发送更短的消息，或稍后重试');
                 } else {
                     throw new Error(errorMessage);
                 }
+            }
+
+            // 验证响应格式
+            if (!responseData.choices?.[0]?.message?.content) {
+                throw new Error('服务器返回了无效的响应格式');
             }
         } catch (error) {
             throw new Error(error.message || '无法连接到服务器');
