@@ -69,12 +69,12 @@ module.exports = async (req, res) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
+                    'Authorization': `Bearer ${API_KEY}`
                 },
                 body: JSON.stringify({
                     model: "deepseek-r1-250120",
                     messages: [
-                        { role: "system", content: "你是一个专业的心理咨询师，擅长帮助用户解决心理问题。" },
+                        { role: "system", content: "你是人工智能助手." },
                         { role: "user", content: messages[messages.length - 1].content }
                     ]
                 }),
