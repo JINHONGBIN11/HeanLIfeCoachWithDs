@@ -1,7 +1,7 @@
 {
   "name": "ai-life-coach",
   "version": "1.0.0",
-  "description": "AI Life Coach website using DeepSeek R1 API",
+  "description": "AI生活教练应用",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,11 +9,14 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.0.3",
     "express": "^4.18.2",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.6.9"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2"
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=14.0.0"
   }
 }
