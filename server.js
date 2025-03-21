@@ -4,7 +4,6 @@ const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
 const app = express();
-const port = process.env.PORT || 3000;
 
 // 使用环境变量获取 API 密钥
 const API_KEY = process.env.DEEPSEEK_API_KEY;
@@ -15,15 +14,12 @@ if (!API_KEY) {
     process.exit(1);
 }
 
-// 中间件配置
+// 中间件
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// API 配置
-const API_URL = 'https://api.deepseek.com/v1/chat/completions';
-
-// 处理聊天请求的路由
+// API 路由
 app.post('/api/chat', async (req, res) => {
     try {
         const { messages } = req.body;
@@ -34,7 +30,7 @@ app.post('/api/chat', async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         
         // 发送请求到 DeepSeek API
-        const response = await fetch(API_URL, {
+        const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -61,7 +57,18 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// 启动服务器
-app.listen(port, () => {
-    console.log(`服务器运行在 http://localhost:${port}`);
+// 处理所有其他路由
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
+
+// 仅在非 Vercel 环境下启动服务器
+if (process.env.NODE_ENV !== 'production') {
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+        console.log(`服务器运行在 http://localhost:${port}`);
+    });
+}
+
+// 导出应用实例供 Vercel 使用
+module.exports = app;
