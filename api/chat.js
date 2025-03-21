@@ -1,5 +1,26 @@
 const fetch = require('node-fetch');
 
+// 设置超时时间为 25 秒
+const TIMEOUT = 25000;
+
+// 创建带超时的 fetch
+const fetchWithTimeout = async (url, options) => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT);
+    
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+        return response;
+    } catch (error) {
+        clearTimeout(timeout);
+        throw error;
+    }
+};
+
 module.exports = async (req, res) => {
     // 启用 CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
@@ -37,8 +58,10 @@ module.exports = async (req, res) => {
             throw new Error('未设置 DEEPSEEK_API_URL 环境变量');
         }
 
+        console.log('开始请求 DeepSeek API...');
+        
         // 发送请求到 DeepSeek API
-        const response = await fetch(API_URL, {
+        const response = await fetchWithTimeout(API_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -56,20 +79,33 @@ module.exports = async (req, res) => {
             })
         });
 
+        console.log('DeepSeek API 响应状态:', response.status);
+
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('API 错误响应:', errorText);
+            console.error('DeepSeek API 错误响应:', errorText);
             throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('成功接收到 DeepSeek API 响应');
+        
         res.status(200).json(data);
         
     } catch (error) {
         console.error('API 调用错误:', error);
-        res.status(500).json({ 
-            error: '服务器错误',
-            message: error.message
-        });
+        
+        // 根据错误类型返回适当的状态码
+        if (error.name === 'AbortError') {
+            res.status(504).json({ 
+                error: '请求超时',
+                message: '服务器响应时间过长，请稍后重试'
+            });
+        } else {
+            res.status(500).json({ 
+                error: '服务器错误',
+                message: error.message
+            });
+        }
     }
 } 

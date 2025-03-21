@@ -191,7 +191,8 @@ async function sendMessage(content) {
         });
 
         if (!response.ok) {
-            throw new Error(`API 请求失败: ${response.status}`);
+            const errorData = await response.json();
+            throw new Error(errorData.message || `API 请求失败: ${response.status}`);
         }
 
         const data = await response.json();
@@ -208,7 +209,15 @@ async function sendMessage(content) {
         
     } catch (error) {
         console.error('发送消息失败:', error);
-        addMessage('抱歉，发生了一些错误。请稍后重试。');
+        let errorMessage = '抱歉，发生了一些错误。';
+        
+        if (error.message.includes('请求超时')) {
+            errorMessage = '服务器响应时间过长，请稍后重试。';
+        } else if (error.message.includes('API 请求失败')) {
+            errorMessage = error.message;
+        }
+        
+        addMessage(errorMessage);
     } finally {
         // 隐藏加载指示器
         loadingIndicator.classList.add('hidden');
