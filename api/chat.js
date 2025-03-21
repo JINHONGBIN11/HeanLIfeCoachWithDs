@@ -95,15 +95,9 @@ module.exports = async (req, res) => {
             res.setHeader('Connection', 'keep-alive');
 
             // 处理流式响应
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
             let buffer = '';
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                buffer += decoder.decode(value, { stream: true });
+            response.body.on('data', chunk => {
+                buffer += chunk.toString();
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
 
@@ -125,7 +119,41 @@ module.exports = async (req, res) => {
                         }
                     }
                 }
-            }
+            });
+
+            response.body.on('end', () => {
+                // 处理剩余的缓冲区
+                if (buffer) {
+                    const lines = buffer.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[DONE]') {
+                                res.write('data: [DONE]\n\n');
+                                res.end();
+                                return;
+                            }
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.choices?.[0]?.delta?.content) {
+                                    res.write(`data: ${JSON.stringify(parsed.choices[0].delta)}\n\n`);
+                                }
+                            } catch (e) {
+                                console.error('解析响应数据错误:', e);
+                            }
+                        }
+                    }
+                }
+                res.end();
+            });
+
+            response.body.on('error', error => {
+                console.error('流处理错误:', error);
+                res.status(500).json({ 
+                    error: '流处理错误',
+                    message: error.message
+                });
+            });
             
         } catch (error) {
             console.error('API 调用错误:', error);
