@@ -1,11 +1,19 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
-require('dotenv').config();
-
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
+
+// 使用环境变量获取 API 密钥
+const API_KEY = process.env.DEEPSEEK_API_KEY;
+
+// 检查必要的环境变量
+if (!API_KEY) {
+    console.error('错误: 未设置 DEEPSEEK_API_KEY 环境变量');
+    process.exit(1);
+}
 
 // 中间件配置
 app.use(cors());
@@ -13,14 +21,19 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // API 配置
-const API_KEY = '71ca1010-f2f4-47c1-b5fe-a6a0f21cf335';
-const API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const API_URL = 'https://api.deepseek.com/v1/chat/completions';
 
 // 处理聊天请求的路由
 app.post('/api/chat', async (req, res) => {
     try {
         const { messages } = req.body;
         
+        // 设置响应头，启用流式传输
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        
+        // 发送请求到 DeepSeek API
         const response = await fetch(API_URL, {
             method: 'POST',
             headers: {
@@ -28,34 +41,27 @@ app.post('/api/chat', async (req, res) => {
                 'Authorization': `Bearer ${API_KEY}`
             },
             body: JSON.stringify({
-                model: 'deepseek-r1-250120',
-                messages: [
-                    {
-                        role: 'system',
-                        content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
-                    },
-                    ...messages
-                ],
-                stream: true,
-                temperature: 0.6
+                model: 'deepseek-chat',
+                messages: messages,
+                stream: true
             })
         });
-
-        // 设置响应头
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
-        // 将流式响应转发给客户端
+        
+        // 检查响应状态
+        if (!response.ok) {
+            throw new Error(`API 请求失败: ${response.status}`);
+        }
+        
+        // 将 API 响应流式传输到客户端
         response.body.pipe(res);
-
+        
     } catch (error) {
-        console.error('Error:', error);
-        res.status(500).json({ error: '服务器内部错误' });
+        console.error('API 调用错误:', error);
+        res.status(500).json({ error: '服务器错误' });
     }
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-    console.log(`服务器运行在 http://localhost:${PORT}`);
-}); 
+app.listen(port, () => {
+    console.log(`服务器运行在 http://localhost:${port}`);
+});
