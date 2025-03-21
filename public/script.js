@@ -159,38 +159,45 @@ function addMessage(content, isUser = false) {
 // 发送消息到服务器
 async function sendMessage(content) {
     try {
-        // 如果是新对话，创建一个
-        if (!currentConversationId) {
-            createNewConversation();
-        }
+        // 显示加载指示器
+        loadingIndicator.classList.remove('hidden');
         
-        // 显示用户消息
+        // 添加用户消息到界面
         addMessage(content, true);
         
         // 添加用户消息到历史记录
         messages.push({ role: 'user', content });
         
-        // 更新对话标题（使用第一条用户消息）
-        if (messages.length === 1) {
-            updateConversationTitle(content);
-        }
-        
-        // 保存当前对话
+        // 保存更新后的对话
         saveCurrentConversation();
         
-        // 显示加载指示器
-        loadingIndicator.classList.remove('hidden');
+        // 创建 AbortController 用于超时控制
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 秒超时
         
-        // 发送请求到服务器
         const response = await fetch('/api/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ 
-                messages: messages.slice(-2) // 只发送最后 2 条消息
-            })
+            body: JSON.stringify({ messages }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => null);
+            let errorMessage = '服务器错误';
+            
+            if (response.status === 504) {
+                errorMessage = '请求超时，请尝试发送更短的消息，或稍后重试';
+            } else if (errorData?.message) {
+                errorMessage = errorData.message;
+            }
+            
+            throw new Error(errorMessage);
+        }
 
         let responseData;
         try {
@@ -213,16 +220,6 @@ async function sendMessage(content) {
                 }
             }
 
-            if (!response.ok) {
-                const errorMessage = responseData.message || responseData.error?.message || `API 请求失败: ${response.status}`;
-                if (response.status === 504) {
-                    throw new Error('请尝试发送更短的消息，或稍后重试');
-                } else {
-                    throw new Error(errorMessage);
-                }
-            }
-
-            // 验证响应格式
             if (!responseData.choices?.[0]?.message?.content) {
                 throw new Error('服务器返回了无效的响应格式');
             }

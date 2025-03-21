@@ -39,6 +39,9 @@ app.post('/api/chat', async (req, res) => {
         res.setHeader('Connection', 'keep-alive');
         
         // 发送请求到 DeepSeek API
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 秒超时
+
         const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -55,8 +58,11 @@ app.post('/api/chat', async (req, res) => {
                     ...messages
                 ],
                 stream: true
-            })
+            }),
+            signal: controller.signal
         });
+        
+        clearTimeout(timeoutId);
         
         // 检查响应状态
         if (!response.ok) {
@@ -77,22 +83,42 @@ app.post('/api/chat', async (req, res) => {
         // 处理流结束
         response.body.on('end', () => {
             console.log('响应流结束');
+            clearTimeout(timeoutId);
         });
         
         // 处理流错误
         response.body.on('error', (error) => {
             console.error('响应流错误:', error);
+            clearTimeout(timeoutId);
+            if (error.name === 'AbortError') {
+                res.status(504).json({ 
+                    error: '请求超时',
+                    message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
+                });
+            } else {
+                res.status(500).json({ 
+                    error: '流处理错误',
+                    message: error.message
+                });
+            }
             res.end();
         });
         
     } catch (error) {
         console.error('API 调用错误:', error);
         // 发送详细的错误信息
-        res.status(500).json({ 
-            error: '服务器错误',
-            message: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
+        if (error.name === 'AbortError') {
+            res.status(504).json({ 
+                error: '请求超时',
+                message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
+            });
+        } else {
+            res.status(500).json({ 
+                error: '服务器错误',
+                message: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            });
+        }
     }
 });
 
