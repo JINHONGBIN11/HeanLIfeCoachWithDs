@@ -54,7 +54,7 @@ module.exports = async (req, res) => {
                     'Authorization': `Bearer ${API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: 'deepseek-chat',
+                    model: 'deepseek-r1-250120',
                     messages: [
                         {
                             role: 'system',
