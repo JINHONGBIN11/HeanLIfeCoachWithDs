@@ -13,11 +13,25 @@
     "routes": [
         {
             "src": "/api/chat",
-            "dest": "/api/chat.js"
+            "dest": "/api/chat.js",
+            "headers": {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET,OPTIONS,PATCH,DELETE,POST,PUT",
+                "Access-Control-Allow-Headers": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version",
+                "Access-Control-Allow-Credentials": "true",
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            },
+            "methods": ["POST", "OPTIONS"],
+            "continue": false
         },
         {
             "src": "/(.*)",
-            "dest": "/public/$1"
+            "dest": "/public/$1",
+            "headers": {
+                "Cache-Control": "public, max-age=31536000, immutable"
+            }
         }
     ]
 } 
