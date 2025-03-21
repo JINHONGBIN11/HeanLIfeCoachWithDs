@@ -1,46 +1,22 @@
 const fetch = require('node-fetch');
 
-// 设置超时时间为 30 秒
-const TIMEOUT = 30000;
+// 使用环境变量获取 API 密钥
+const API_KEY = process.env.DEEPSEEK_API_KEY;
 
-// 创建带超时的 fetch
-const fetchWithTimeout = async (url, options) => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT);
-    
-    try {
-        const response = await fetch(url, {
-            ...options,
-            signal: controller.signal
-        });
-        clearTimeout(timeout);
-        return response;
-    } catch (error) {
-        clearTimeout(timeout);
-        if (error.name === 'AbortError') {
-            throw new Error('请求超时，请稍后重试');
-        }
-        throw error;
-    }
-};
-
-// 简化系统提示以减少 token 数量
-const SYSTEM_PROMPT = '你是AI生活教练';
-
-// 预处理消息，减少 token 数量
-function preprocessMessages(messages) {
-    return messages.map(msg => ({
-        role: msg.role,
-        content: msg.content.slice(0, 200) // 限制每条消息的长度
-    }));
+// 检查必要的环境变量
+if (!API_KEY) {
+    console.error('错误: 未设置 DEEPSEEK_API_KEY 环境变量');
 }
 
 module.exports = async (req, res) => {
-    // 启用 CORS
+    // 设置 CORS 头
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-    res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
 
     // 处理 OPTIONS 请求
     if (req.method === 'OPTIONS') {
@@ -50,115 +26,106 @@ module.exports = async (req, res) => {
 
     // 只允许 POST 请求
     if (req.method !== 'POST') {
-        return res.status(405).json({ 
-            error: '方法不允许',
-            message: '只支持 POST 请求'
-        });
+        return res.status(405).json({ error: '方法不允许' });
     }
 
     try {
+        console.log('收到聊天请求');
         const { messages } = req.body;
         
         if (!messages || !Array.isArray(messages)) {
-            return res.status(400).json({ 
-                error: '无效的请求格式',
-                message: '消息必须是数组格式'
-            });
+            console.error('无效的消息格式:', messages);
+            return res.status(400).json({ error: '无效的请求格式' });
         }
 
-        // 限制消息历史长度，只保留最后 2 条消息
-        const recentMessages = messages.slice(-2);
+        console.log('准备发送到 DeepSeek API');
+        console.log('API Key:', API_KEY ? '已设置' : '未设置');
         
-        // 预处理消息
-        const processedMessages = preprocessMessages(recentMessages);
-
-        // 从环境变量获取 API 配置
-        const API_KEY = process.env.DEEPSEEK_API_KEY;
-        const API_URL = process.env.DEEPSEEK_API_URL;
-        
-        if (!API_KEY) {
-            throw new Error('未设置 DEEPSEEK_API_KEY 环境变量');
-        }
-
-        if (!API_URL) {
-            throw new Error('未设置 DEEPSEEK_API_URL 环境变量');
-        }
-
         // 发送请求到 DeepSeek API
-        const response = await fetchWithTimeout(API_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`
-            },
-            body: JSON.stringify({
-                model: 'deepseek-r1-250120',
-                messages: [
-                    {
-                        role: 'system',
-                        content: SYSTEM_PROMPT
-                    },
-                    ...processedMessages
-                ],
-                max_tokens: 300,  // 进一步限制响应长度
-                temperature: 0.5,  // 降低随机性以加快响应
-                top_p: 0.8,       // 限制采样范围以加快响应
-                presence_penalty: 0,
-                frequency_penalty: 0
-            })
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 秒超时
 
-        const responseText = await response.text();
-
-        // 如果响应不是 JSON 格式，创建一个标准格式的响应
-        let data;
         try {
-            data = JSON.parse(responseText);
-        } catch (parseError) {
-            // 如果响应不是 JSON，但状态码是 200，则将文本作为消息内容
-            if (response.ok) {
-                data = {
-                    choices: [{
-                        message: {
-                            content: responseText.slice(0, 500) // 限制响应长度
-                        }
-                    }]
-                };
+            const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${API_KEY}`
+                },
+                body: JSON.stringify({
+                    model: 'deepseek-chat',
+                    messages: [
+                        {
+                            role: 'system',
+                            content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
+                        },
+                        ...messages.slice(-2)
+                    ],
+                    stream: false, // 禁用流式响应
+                    max_tokens: 300,
+                    temperature: 0.7,
+                    presence_penalty: 0.6
+                }),
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('DeepSeek API 错误:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText
+                });
+                throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
+            }
+            
+            console.log('成功连接到 DeepSeek API');
+            
+            // 解析响应
+            const responseData = await response.json();
+            
+            if (!responseData.choices?.[0]?.message?.content) {
+                console.error('无效的响应格式:', responseData);
+                throw new Error('服务器返回了无效的响应格式');
+            }
+            
+            // 发送响应
+            res.json(responseData);
+            
+        } catch (error) {
+            console.error('API 调用错误:', error);
+            clearTimeout(timeoutId);
+            
+            // 发送详细的错误信息
+            if (error.name === 'AbortError') {
+                res.status(504).json({ 
+                    error: '请求超时',
+                    message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
+                });
             } else {
-                throw new Error(responseText || '服务器返回了无效的响应');
+                res.status(500).json({ 
+                    error: '服务器错误',
+                    message: error.message,
+                    stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+                });
             }
         }
-
-        if (!response.ok) {
-            throw new Error(data.error?.message || `API 请求失败: ${response.status}`);
-        }
-
-        // 确保响应格式正确
-        if (!data.choices?.[0]?.message?.content) {
-            throw new Error('API 响应格式无效');
-        }
-
-        res.status(200).json(data);
-        
     } catch (error) {
         console.error('API 调用错误:', error);
-        
-        // 根据错误类型返回适当的状态码和格式化的错误信息
+        // 发送详细的错误信息
         if (error.name === 'AbortError') {
             res.status(504).json({ 
                 error: '请求超时',
-                message: '请尝试发送更短的消息，或稍后重试'
-            });
-        } else if (error.message.includes('JSON')) {
-            res.status(502).json({ 
-                error: '响应格式错误',
-                message: '服务器返回了无效的数据格式'
+                message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
             });
         } else {
             res.status(500).json({ 
                 error: '服务器错误',
-                message: error.message
+                message: error.message,
+                stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
             });
         }
     }
-}
+};
