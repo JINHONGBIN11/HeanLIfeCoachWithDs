@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
 // 使用环境变量获取 API 密钥
-const API_KEY = process.env.ARK_API_KEY;
+const API_KEY = process.env.ARK_API_KEY || 'd4d92fd7-850a-49b5-9b32-bedbd3252b5f';
 const API_URL = process.env.DEEPSEEK_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 // 检查必要的环境变量
@@ -9,6 +9,7 @@ if (!API_KEY) {
     console.error('错误: 未设置 ARK_API_KEY 环境变量');
 } else {
     console.log('API Key 已设置，长度:', API_KEY.length);
+    console.log('API Key 前8位:', API_KEY.substring(0, 8) + '...');
 }
 
 console.log('API URL:', API_URL);
@@ -65,6 +66,19 @@ module.exports = async (req, res) => {
 
         try {
             console.log('发送请求到 DeepSeek API');
+            console.log('请求URL:', API_URL);
+            console.log('请求头:', {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${API_KEY}`
+            });
+            console.log('请求体:', {
+                model: "deepseek-r1-250120",
+                messages: [
+                    {"role": "system", "content": "你是人工智能助手."},
+                    {"role": "user", "content": messages[messages.length - 1].content}
+                ]
+            });
+            
             const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: {
