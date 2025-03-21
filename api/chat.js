@@ -44,7 +44,7 @@ module.exports = async (req, res) => {
         
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 增加到 30 秒超时
 
         try {
             const response = await fetch(API_URL, {
@@ -103,7 +103,7 @@ module.exports = async (req, res) => {
             if (error.name === 'AbortError') {
                 res.status(504).json({ 
                     error: '请求超时',
-                    message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
+                    message: '服务器处理请求超时，请稍后重试。如果问题持续存在，请联系管理员。'
                 });
             } else {
                 res.status(500).json({ 
