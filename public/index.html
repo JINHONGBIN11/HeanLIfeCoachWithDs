@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 生活教练</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <h2>对话历史</h2>
+            <button id="newChatButton" class="new-chat-button">新对话</button>
+        </div>
+        <div class="conversation-list" id="conversationList">
+            <!-- 对话列表将通过 JavaScript 动态添加 -->
+        </div>
+    </aside>
+
+    <!-- 主要内容区域 -->
+    <div class="main-container">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <button id="toggleSidebar" class="toggle-sidebar">☰</button>
+            <h1>AI 生活教练</h1>
+            <div class="header-controls">
+                <button id="clearButton" class="clear-button">清除对话</button>
+                <button id="themeToggle" class="theme-toggle">🌙</button>
+            </div>
+        </header>
+
+        <!-- 主要内容区域 -->
+        <main class="main">
+            <!-- 对话历史区域 -->
+            <div class="chat-container" id="chatContainer">
+                <!-- 欢迎消息 -->
+                <div class="message ai-message">
+                    <div class="message-content">
+                        你好！我是你的 AI 生活教练。我可以帮助你解决生活中的问题，提供建议和指导。请告诉我你最近遇到了什么困扰？
+                    </div>
+                </div>
+            </div>
+
+            <!-- 输入区域 -->
+            <div class="input-container">
+                <textarea 
+                    id="userInput" 
+                    placeholder="请输入你的问题或困扰..."
+                    rows="1"
+                ></textarea>
+                <button id="sendButton" class="send-button">发送</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- 加载指示器 -->
+    <div id="loadingIndicator" class="loading-indicator hidden">
+        <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
