@@ -2,7 +2,7 @@ const fetch = require('node-fetch');
 
 // 使用环境变量获取 API 密钥
 const API_KEY = process.env.ARK_API_KEY;
-const API_URL = 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const API_URL = process.env.DEEPSEEK_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
 
 // 检查必要的环境变量
 if (!API_KEY) {
@@ -69,11 +69,14 @@ module.exports = async (req, res) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${API_KEY}`
+                    'Authorization': `Bearer ${process.env.DEEPSEEK_API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: 'deepseek-r1-250120',
-                    messages: truncatedMessages
+                    model: "deepseek-r1-250120",
+                    messages: [
+                        { role: "system", content: "你是一个专业的心理咨询师，擅长帮助用户解决心理问题。" },
+                        { role: "user", content: messages[messages.length - 1].content }
+                    ]
                 }),
                 signal: controller.signal
             });
