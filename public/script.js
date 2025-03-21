@@ -182,7 +182,7 @@ async function sendMessage(content) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ 
-                    messages: messages.slice(-2) // 只发送最近的 2 条消息，进一步减少数据量
+                    messages: messages.slice(-2)
                 }),
                 signal: controller.signal
             });
@@ -202,16 +202,11 @@ async function sendMessage(content) {
                 throw new Error(errorMessage);
             }
             
-            let responseData;
-            try {
-                responseData = await response.json();
-            } catch (error) {
-                console.error('解析响应失败:', error);
-                throw new Error('服务器返回了无效的响应格式');
-            }
+            const responseData = await response.json();
             
             // 验证响应格式
             if (!responseData.choices?.[0]?.message?.content) {
+                console.error('无效的响应格式:', responseData);
                 throw new Error('服务器返回了无效的响应格式');
             }
             

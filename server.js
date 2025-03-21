@@ -35,7 +35,7 @@ app.post('/api/chat', async (req, res) => {
         
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 6000); // 减少到 6 秒超时，留出 4 秒缓冲时间
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 秒超时
 
         try {
             const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
@@ -51,12 +51,12 @@ app.post('/api/chat', async (req, res) => {
                             role: 'system',
                             content: '你是一位专业的生活教练，擅长帮助人们解决生活中的问题，提供建设性的建议和指导。请以温和、专业的态度与用户交流。'
                         },
-                        ...messages.slice(-2) // 只发送最近的 2 条消息，进一步减少数据量
+                        ...messages.slice(-2)
                     ],
-                    stream: true,
-                    max_tokens: 300, // 进一步限制响应长度
-                    temperature: 0.7, // 添加温度参数以加快响应
-                    presence_penalty: 0.6 // 添加存在惩罚以减少重复
+                    stream: false, // 禁用流式响应
+                    max_tokens: 300,
+                    temperature: 0.7,
+                    presence_penalty: 0.6
                 }),
                 signal: controller.signal
             });
@@ -65,42 +65,26 @@ app.post('/api/chat', async (req, res) => {
             
             if (!response.ok) {
                 const errorText = await response.text();
+                console.error('DeepSeek API 错误:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    error: errorText
+                });
                 throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
             }
             
             console.log('成功连接到 DeepSeek API');
             
-            // 设置响应头，启用流式传输
-            res.setHeader('Content-Type', 'text/event-stream');
-            res.setHeader('Cache-Control', 'no-cache');
-            res.setHeader('Connection', 'keep-alive');
+            // 解析响应
+            const responseData = await response.json();
             
-            // 将 API 响应流式传输到客户端
-            response.body.pipe(res);
+            if (!responseData.choices?.[0]?.message?.content) {
+                console.error('无效的响应格式:', responseData);
+                throw new Error('服务器返回了无效的响应格式');
+            }
             
-            // 处理流结束
-            response.body.on('end', () => {
-                console.log('响应流结束');
-                clearTimeout(timeoutId);
-            });
-            
-            // 处理流错误
-            response.body.on('error', (error) => {
-                console.error('响应流错误:', error);
-                clearTimeout(timeoutId);
-                if (error.name === 'AbortError') {
-                    res.status(504).json({ 
-                        error: '请求超时',
-                        message: '服务器处理请求超时，请尝试发送更短的消息或稍后重试'
-                    });
-                } else {
-                    res.status(500).json({ 
-                        error: '流处理错误',
-                        message: error.message
-                    });
-                }
-                res.end();
-            });
+            // 发送响应
+            res.json(responseData);
             
         } catch (error) {
             console.error('API 调用错误:', error);
