@@ -9,44 +9,34 @@ if (!API_KEY) {
     console.error('错误: 未设置 DEEPSEEK_API_KEY 环境变量');
 }
 
-// 配置 Edge Runtime
-export const config = {
-    runtime: 'edge',
-    regions: ['hkg1'], // 使用香港区域，可能更快
-};
-
-export default async function handler(req) {
+module.exports = async (req, res) => {
     // 设置 CORS 头
-    const headers = {
-        'Access-Control-Allow-Credentials': 'true',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS,PATCH,DELETE,POST,PUT',
-        'Access-Control-Allow-Headers': 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
-    };
+    res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+    res.setHeader(
+        'Access-Control-Allow-Headers',
+        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    );
 
     // 处理 OPTIONS 请求
     if (req.method === 'OPTIONS') {
-        return new Response(null, { headers });
+        res.status(200).end();
+        return;
     }
 
     // 只允许 POST 请求
     if (req.method !== 'POST') {
-        return new Response(JSON.stringify({ error: '方法不允许' }), {
-            status: 405,
-            headers: { ...headers, 'Content-Type': 'application/json' }
-        });
+        return res.status(405).json({ error: '方法不允许' });
     }
 
     try {
         console.log('收到聊天请求');
-        const { messages } = await req.json();
+        const { messages } = req.body;
         
         if (!messages || !Array.isArray(messages)) {
             console.error('无效的消息格式:', messages);
-            return new Response(JSON.stringify({ error: '无效的请求格式' }), {
-                status: 400,
-                headers: { ...headers, 'Content-Type': 'application/json' }
-            });
+            return res.status(400).json({ error: '无效的请求格式' });
         }
 
         // 限制消息长度
@@ -99,42 +89,43 @@ export default async function handler(req) {
                 throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
             }
 
-            // 创建 TransformStream 来处理流式响应
-            const stream = new TransformStream({
-                async transform(chunk, controller) {
-                    const text = new TextDecoder().decode(chunk);
-                    const lines = text.split('\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.slice(6);
-                            if (data === '[DONE]') {
-                                controller.enqueue('data: [DONE]\n\n');
-                                controller.terminate();
-                                return;
+            // 设置响应头
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+
+            // 处理流式响应
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const data = line.slice(6);
+                        if (data === '[DONE]') {
+                            res.write('data: [DONE]\n\n');
+                            res.end();
+                            return;
+                        }
+                        try {
+                            const parsed = JSON.parse(data);
+                            if (parsed.choices?.[0]?.delta?.content) {
+                                res.write(`data: ${JSON.stringify(parsed.choices[0].delta)}\n\n`);
                             }
-                            try {
-                                const parsed = JSON.parse(data);
-                                if (parsed.choices?.[0]?.delta?.content) {
-                                    controller.enqueue(`data: ${JSON.stringify(parsed.choices[0].delta)}\n\n`);
-                                }
-                            } catch (e) {
-                                console.error('解析响应数据错误:', e);
-                            }
+                        } catch (e) {
+                            console.error('解析响应数据错误:', e);
                         }
                     }
                 }
-            });
-
-            // 返回流式响应
-            return new Response(response.body.pipeThrough(stream), {
-                headers: {
-                    ...headers,
-                    'Content-Type': 'text/event-stream',
-                    'Cache-Control': 'no-cache',
-                    'Connection': 'keep-alive'
-                }
-            });
+            }
             
         } catch (error) {
             console.error('API 调用错误:', error);
@@ -142,31 +133,22 @@ export default async function handler(req) {
             
             // 发送详细的错误信息
             if (error.name === 'AbortError') {
-                return new Response(JSON.stringify({ 
+                res.status(504).json({ 
                     error: '请求超时',
                     message: '服务器处理请求超时，请稍后重试。'
-                }), {
-                    status: 504,
-                    headers: { ...headers, 'Content-Type': 'application/json' }
                 });
             } else {
-                return new Response(JSON.stringify({ 
+                res.status(500).json({ 
                     error: '服务器错误',
                     message: error.message
-                }), {
-                    status: 500,
-                    headers: { ...headers, 'Content-Type': 'application/json' }
                 });
             }
         }
     } catch (error) {
         console.error('API 调用错误:', error);
-        return new Response(JSON.stringify({ 
+        res.status(500).json({ 
             error: '服务器错误',
             message: error.message
-        }), {
-            status: 500,
-            headers: { ...headers, 'Content-Type': 'application/json' }
         });
     }
-}
+};
