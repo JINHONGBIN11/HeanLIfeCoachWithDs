@@ -173,7 +173,7 @@ async function sendMessage(content) {
         
         // 创建 AbortController 用于超时控制
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000); // 减少到 8 秒超时，留出 2 秒缓冲时间
+        const timeoutId = setTimeout(() => controller.abort(), 6000); // 减少到 6 秒超时，留出 4 秒缓冲时间
         
         try {
             const response = await fetch('/api/chat', {
@@ -182,7 +182,7 @@ async function sendMessage(content) {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({ 
-                    messages: messages.slice(-4) // 只发送最近的 4 条消息，减少数据量
+                    messages: messages.slice(-2) // 只发送最近的 2 条消息，进一步减少数据量
                 }),
                 signal: controller.signal
             });
