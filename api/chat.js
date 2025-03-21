@@ -2,6 +2,7 @@ const fetch = require('node-fetch');
 
 // 使用环境变量获取 API 密钥
 const API_KEY = process.env.DEEPSEEK_API_KEY;
+const API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/v1/chat/completions';
 
 // 检查必要的环境变量
 if (!API_KEY) {
@@ -46,7 +47,7 @@ module.exports = async (req, res) => {
         const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 秒超时
 
         try {
-            const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
+            const response = await fetch(API_URL, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
