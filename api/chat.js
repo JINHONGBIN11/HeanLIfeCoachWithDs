@@ -42,14 +42,14 @@ module.exports = async (req, res) => {
         // 限制消息长度
         const truncatedMessages = messages.slice(-2).map(msg => ({
             role: msg.role,
-            content: msg.content.slice(0, 500) // 限制每条消息的长度
+            content: msg.content.slice(0, 300) // 减少每条消息的最大长度
         }));
 
         console.log('准备发送到 DeepSeek API');
         
         // 发送请求到 DeepSeek API
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 25000); // 设置为 25 秒，给予足够的思考时间
+        const timeoutId = setTimeout(() => controller.abort(), 8000); // 设置为 8 秒，确保在 Vercel 超时前完成
 
         try {
             const response = await fetch(API_URL, {
@@ -69,7 +69,7 @@ module.exports = async (req, res) => {
                     ],
                     stream: true, // 启用流式响应
                     temperature: 0.7, // 增加一些随机性
-                    max_tokens: 1000, // 允许更长的响应
+                    max_tokens: 500, // 减少最大 token 数
                     top_p: 0.8, // 控制输出的多样性
                     presence_penalty: 0.6, // 减少重复内容
                     frequency_penalty: 0.6 // 增加输出的多样性
@@ -163,7 +163,7 @@ module.exports = async (req, res) => {
             if (error.name === 'AbortError') {
                 res.status(504).json({ 
                     error: '请求超时',
-                    message: '服务器处理请求超时，请稍后重试。'
+                    message: '服务器处理请求超时，请尝试发送更短的消息，或稍后重试。'
                 });
             } else {
                 res.status(500).json({ 
