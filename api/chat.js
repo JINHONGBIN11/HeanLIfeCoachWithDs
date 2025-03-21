@@ -1,8 +1,8 @@
 const fetch = require('node-fetch');
 
 // 使用环境变量获取 API 密钥
-const API_KEY = process.env.ARK_API_KEY || 'd4d92fd7-850a-49b5-9b32-bedbd3252b5f';
-const API_URL = process.env.DEEPSEEK_API_URL || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions';
+const API_KEY = process.env.ARK_API_KEY || 'sk-5d5b98f077914f0bb4fd1b4cb632b2e8';
+const API_URL = process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com/chat/completions';
 
 // 检查必要的环境变量
 if (!API_KEY) {
@@ -72,11 +72,12 @@ module.exports = async (req, res) => {
                 'Authorization': `Bearer ${API_KEY}`
             });
             console.log('请求体:', {
-                model: "deepseek-r1-250120",
+                model: "deepseek-chat",
                 messages: [
                     {"role": "system", "content": "你是人工智能助手."},
                     {"role": "user", "content": messages[messages.length - 1].content}
-                ]
+                ],
+                stream: false
             });
             
             const response = await fetch(API_URL, {
@@ -86,11 +87,12 @@ module.exports = async (req, res) => {
                     'Authorization': `Bearer ${API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: "deepseek-r1-250120",
+                    model: "deepseek-chat",
                     messages: [
                         {"role": "system", "content": "你是人工智能助手."},
                         {"role": "user", "content": messages[messages.length - 1].content}
-                    ]
+                    ],
+                    stream: false
                 }),
                 signal: controller.signal
             });
