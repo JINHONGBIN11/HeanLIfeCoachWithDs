@@ -190,13 +190,26 @@ async function sendMessage(content) {
             body: JSON.stringify({ messages })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.message || `API 请求失败: ${response.status}`);
+        let errorData;
+        let responseData;
+
+        try {
+            const textResponse = await response.text();
+            try {
+                responseData = JSON.parse(textResponse);
+                if (!response.ok) {
+                    errorData = responseData;
+                    throw new Error(errorData.message || `API 请求失败: ${response.status}`);
+                }
+            } catch (parseError) {
+                console.error('JSON 解析错误:', parseError);
+                throw new Error('服务器返回了无效的数据格式');
+            }
+        } catch (error) {
+            throw new Error(error.message || '无法连接到服务器');
         }
 
-        const data = await response.json();
-        const aiResponse = data.choices[0].message.content;
+        const aiResponse = responseData.choices[0].message.content;
         
         // 显示 AI 响应
         addMessage(aiResponse);
@@ -213,8 +226,12 @@ async function sendMessage(content) {
         
         if (error.message.includes('请求超时')) {
             errorMessage = '服务器响应时间过长，请稍后重试。';
+        } else if (error.message.includes('无效的数据格式')) {
+            errorMessage = '服务器返回了无效的响应，请稍后重试。';
         } else if (error.message.includes('API 请求失败')) {
             errorMessage = error.message;
+        } else if (error.message.includes('无法连接到服务器')) {
+            errorMessage = '无法连接到服务器，请检查网络连接。';
         }
         
         addMessage(errorMessage);

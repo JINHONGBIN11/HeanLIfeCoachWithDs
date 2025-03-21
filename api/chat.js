@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
-// 设置超时时间为 25 秒
-const TIMEOUT = 25000;
+// 设置超时时间为 50 秒
+const TIMEOUT = 50000;
 
 // 创建带超时的 fetch
 const fetchWithTimeout = async (url, options) => {
@@ -36,14 +36,20 @@ module.exports = async (req, res) => {
 
     // 只允许 POST 请求
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: '方法不允许' });
+        return res.status(405).json({ 
+            error: '方法不允许',
+            message: '只支持 POST 请求'
+        });
     }
 
     try {
         const { messages } = req.body;
         
         if (!messages || !Array.isArray(messages)) {
-            return res.status(400).json({ error: '无效的请求格式' });
+            return res.status(400).json({ 
+                error: '无效的请求格式',
+                message: '消息必须是数组格式'
+            });
         }
 
         // 从环境变量获取 API 配置
@@ -59,6 +65,7 @@ module.exports = async (req, res) => {
         }
 
         console.log('开始请求 DeepSeek API...');
+        console.log('API URL:', API_URL);
         
         // 发送请求到 DeepSeek API
         const response = await fetchWithTimeout(API_URL, {
@@ -81,25 +88,35 @@ module.exports = async (req, res) => {
 
         console.log('DeepSeek API 响应状态:', response.status);
 
+        const responseText = await response.text();
+        console.log('DeepSeek API 响应内容:', responseText);
+
         if (!response.ok) {
-            const errorText = await response.text();
-            console.error('DeepSeek API 错误响应:', errorText);
-            throw new Error(`API 请求失败: ${response.status} - ${errorText}`);
+            throw new Error(`API 请求失败: ${response.status} - ${responseText}`);
         }
 
-        const data = await response.json();
-        console.log('成功接收到 DeepSeek API 响应');
-        
-        res.status(200).json(data);
+        try {
+            const data = JSON.parse(responseText);
+            console.log('成功解析 DeepSeek API 响应');
+            res.status(200).json(data);
+        } catch (parseError) {
+            console.error('JSON 解析错误:', parseError);
+            throw new Error(`响应格式错误: ${responseText}`);
+        }
         
     } catch (error) {
         console.error('API 调用错误:', error);
         
-        // 根据错误类型返回适当的状态码
+        // 根据错误类型返回适当的状态码和格式化的错误信息
         if (error.name === 'AbortError') {
             res.status(504).json({ 
                 error: '请求超时',
                 message: '服务器响应时间过长，请稍后重试'
+            });
+        } else if (error.message.includes('JSON')) {
+            res.status(502).json({ 
+                error: '响应格式错误',
+                message: '服务器返回了无效的数据格式'
             });
         } else {
             res.status(500).json({ 
