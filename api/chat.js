@@ -1,7 +1,7 @@
 const fetch = require('node-fetch');
 
-// 设置超时时间为 5 秒
-const TIMEOUT = 5000;
+// 设置超时时间为 30 秒
+const TIMEOUT = 30000;
 
 // 创建带超时的 fetch
 const fetchWithTimeout = async (url, options) => {
@@ -17,6 +17,9 @@ const fetchWithTimeout = async (url, options) => {
         return response;
     } catch (error) {
         clearTimeout(timeout);
+        if (error.name === 'AbortError') {
+            throw new Error('请求超时，请稍后重试');
+        }
         throw error;
     }
 };
@@ -158,4 +161,4 @@ module.exports = async (req, res) => {
             });
         }
     }
-} 
+}
