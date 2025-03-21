@@ -79,7 +79,10 @@ export default async function handler(req) {
                     ],
                     stream: true, // 启用流式响应
                     temperature: 0.7, // 增加一些随机性
-                    max_tokens: 1000 // 允许更长的响应
+                    max_tokens: 1000, // 允许更长的响应
+                    top_p: 0.8, // 控制输出的多样性
+                    presence_penalty: 0.6, // 减少重复内容
+                    frequency_penalty: 0.6 // 增加输出的多样性
                 }),
                 signal: controller.signal
             });
