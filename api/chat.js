@@ -72,12 +72,17 @@ module.exports = async (req, res) => {
                 'Authorization': `Bearer ${API_KEY}`
             });
             console.log('请求体:', {
-                model: "deepseek-chat",
+                model: 'deepseek-chat',
                 messages: [
-                    {"role": "system", "content": "你是人工智能助手."},
-                    {"role": "user", "content": messages[messages.length - 1].content}
+                    { role: 'system', content: 'You are a helpful assistant.' },
+                    ...messages
                 ],
-                stream: false
+                stream: true,
+                temperature: 0.7,
+                max_tokens: 1000,
+                top_p: 0.8,
+                presence_penalty: 0.6,
+                frequency_penalty: 0.6
             });
             
             const response = await fetch(API_URL, {
@@ -87,12 +92,17 @@ module.exports = async (req, res) => {
                     'Authorization': `Bearer ${API_KEY}`
                 },
                 body: JSON.stringify({
-                    model: "deepseek-chat",
+                    model: 'deepseek-chat',
                     messages: [
-                        {"role": "system", "content": "你是人工智能助手."},
-                        {"role": "user", "content": messages[messages.length - 1].content}
+                        { role: 'system', content: 'You are a helpful assistant.' },
+                        ...messages
                     ],
-                    stream: false
+                    stream: true,
+                    temperature: 0.7,
+                    max_tokens: 1000,
+                    top_p: 0.8,
+                    presence_penalty: 0.6,
+                    frequency_penalty: 0.6
                 }),
                 signal: controller.signal
             });
